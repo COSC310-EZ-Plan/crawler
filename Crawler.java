@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.io.PrintWriter;
@@ -9,8 +10,9 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 /**
- * Handles reading and parsing of the course webpage to
- * retrieve the latest course info.
+ * Version 0.2: Handles reading and parsing of the course webpage to
+ * retrieve the latest course info, as well as reading degree
+ * and program requirements.
  * @author Eliana Wardle (38509121)
  * 
  * Note, this uses the jsoup library;
@@ -24,28 +26,24 @@ import org.jsoup.select.Elements;
  */
 
 public class Crawler {
-	
+
 	/**
-	 * Global Variables 
-	 */
-	
-	/**
-	 * Constant for the root page (containing links to each course sublist) to start parsing from
+	 * Constant for the root pages (which link to each course sublist or each degree specification) to start parsing from
 	 */
 	private static final String ROOT_URL = "http://www.calendar.ubc.ca/okanagan/courses.cfm?go=code";
+	private static final String DEGREES_URL = "http://www.calendar.ubc.ca/okanagan/index.cfm?tree=18,0,0,0";
 	
 	/**
 	 * 
 	 */
-	private ArrayList<Course> courseList;
-	
+	private ArrayList<Tuple> courseList;
 
 	/**
 	 * Constructor: create a new instance of a crawler/parser
 	 */
 	public Crawler() {
 		// Initialize global variables with default values
-		courseList = new ArrayList<Course>();
+		courseList = new ArrayList<Tuple>();
 	}
 	
 	/**
@@ -53,8 +51,7 @@ public class Crawler {
 	 * @param args
 	 */
 	public static void main(String[] args) throws IOException {
-		// TODO
-		// Create crawler instance
+		
 		Crawler crawler = new Crawler();
 		
 		// Load the subject area list page (linking to each sublist of courses according to subject area)
@@ -64,20 +61,32 @@ public class Crawler {
 		// for table rows containing a course list link for a faculty
 		Elements pages = nav.body().select("tr.row-highlight"); 
 		
-		System.out.println("Populating course data...");
+		System.out.println("Retrieving course data...");
 		
+		// Parse out all courses and add them to the course list
 		/* */
 		for (Element page : pages) {
 			// Retrieve the subject code and get its contained courses:
 			// in current version of course root, will be the text of
 			// the row-highlight's child "td a" grandchild
 			String subjectCode = page.child(0).child(0).ownText();
-			crawler.parseAllFrom(subjectCode);
+			crawler.parseCoursesFrom(subjectCode);
 		}
-		// For now, write to a text file line-by-line with courses listed as tuples 
+		/* */
+		
+		// For demonstration purposes, faster to just parse one subject worth (COSC in this case):
+		/*
+		crawler.parseCoursesFrom(pages.get(8).child(0).child(0).ownText());
+		/* */
+		
+		System.out.println("Course data retrieved. Populating table...");
+		/* */
+		
+		/*
+		// Initially, wrote to a text file line-by-line with courses listed as tuples 
 		PrintWriter writer = new PrintWriter("sample-output.txt");
 		for (Course c: crawler.courseList) {
-			writer.println(c.toTuple());
+			writer.println(c.toString());
 		}
 		writer.close();
 		/* */
@@ -91,23 +100,33 @@ public class Crawler {
 		}
 		/* */
 		
-		// TODO: Rather than printing out, add each course to database.
+		// Rather than printing out, add each course to database.
+		String path = "jdbc:mysql://cosc304.ok.ubc.ca/db_ewardle",
+				user = "ewardle", pass = "38509121";
+		Tuple first = crawler.courseList.get(0); // ugly syntax...
+		String tableDDL = first.getTableDDL();
+		String tableName = first.getTableTitle();
 		
-		// Confirm after completion of method.
-		System.out.println("Done populating course data.");
+		MySQLTableInput table = new MySQLTableInput(path, user, pass);
+		boolean created = table.createTable(tableDDL);
+		int count = table.populateTable(tableName, crawler.courseList.iterator());
+		if (created && count == crawler.courseList.size()) {
+			// Confirm after completion of method.
+			System.out.println("Done populating table with course data.");
+		}
 	}
 	
 	/**
 	 * Add all the courses in the specified page to the course list.
 	 * @param subjectCode The specific subject area to retrieve course data from.
 	 */
-	private void parseAllFrom(String subjectCode) throws IOException {
+	private void parseCoursesFrom(String subjectCode) throws IOException {
 		Document page = Jsoup.connect(ROOT_URL+"&code="+subjectCode).get();
 		Elements courseTitles = page.body().select("dt"); // tag type used specifically for course titles
 
 		for (Element titleElement : courseTitles) {
 			// Create the course objects
-			Course cNew = parseDetails(titleElement);
+			Course cNew = parseCourseDetails(titleElement);
 			courseList.add(cNew);
 		}
 	}
@@ -116,7 +135,7 @@ public class Crawler {
 	 * @param titleElement The <dt> element of a particular course.
 	 * @return A course object parsed out from that course title.
 	 */
-	private Course parseDetails(Element titleElement) {
+	private Course parseCourseDetails(Element titleElement) {
 		// Each course has a predictable, well-defined structure:
 		/*
 		 	<dt><a name="000"></a>[SUBJ] [num] ([credits])  <b>[title]</b></dt>
@@ -131,10 +150,12 @@ public class Crawler {
 		// and each word of the course title (easier to get the bold element contents instead)
 		String fullTitle = titleElement.text();
 		String[] titlePieces = fullTitle.split(" ");
+		
 		// Get the useful components as their own variables
 		String subject = titlePieces[0];
 		int number = Integer.parseInt(titlePieces[1]);
 		String[] creditList = titlePieces[2].replaceAll("[()]","").split("[-/]"); // remove parentheses around credits
+		
 		// Must parse further in case course can be taken multiple times (format: "([credits][-/][max])")
 		BigDecimal credits = new BigDecimal(creditList[0]);
 		BigDecimal maxCredits = credits; // Default, same as regular credits
@@ -149,6 +170,7 @@ public class Crawler {
 		String fullDesc = descElement.html();
 		String[] descPieces = fullDesc.split("<br>");
 		String description = null, prereqs = null, coreqs = null;
+		
 		// Find the appropriate value to assign based on contents of each newline-separated field.
 		for (int checkIndex = 0; checkIndex < descPieces.length; checkIndex++) {
 			String piece = descPieces[checkIndex];
@@ -167,4 +189,13 @@ public class Crawler {
 		// Create the course object
 		return new Course(subject, number, credits, maxCredits, title, description, prereqs, coreqs);
 	}
+
+	
+	private void parseRequirementsFrom(String degree) throws IOException {
+		// TODO If able to do it programmatically, do so here;
+		// otherwise, will need to hard-code things in.
+	}
+	
+
+
 }

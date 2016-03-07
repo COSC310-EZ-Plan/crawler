@@ -7,7 +7,7 @@ import java.math.BigDecimal;
  * @author Eliana Wardle (38509121)
  *
  */
-public class Course {
+public class Course implements Tuple {
 	/**
 	 * Relational Attributes
 	 * (Private visibility with getter methods only, since a course
@@ -47,7 +47,7 @@ public class Course {
 	}
 	
 	/**
-	 * Getter methods
+	 * Getter methods (mostly unnecessary, actually)
 	 */
 	
 	String getSubject() {
@@ -73,10 +73,11 @@ public class Course {
 	}
 
 	/**
-	 * Tuple representation of the course.
-	 * @return entire course as tab-separated "tuple"
+	 * String representation of the course.
+	 * @return entire course as tab-separated text
 	 */
-	String toTuple() {
+	@Override
+	public String toString() {
 		String ret =
 				getCourseCode()+"\t"
 				+ title+"\t"
@@ -86,8 +87,67 @@ public class Course {
 	}
 	
 	/**
-	 * String representation of the course.
-	 * @return Course info similar to that read into the crawler
+	 * Gets the column names of the course tuple.
 	 */
-	// TODO
+	@Override
+	public String[] getColumns() {
+		return new String[] {
+				"cname", 
+				"title", 
+				"credits", 
+				"maxcredits", 
+				"description", // cannot use "desc" as it is a MySQL reserved word
+				"prereq", 
+				"coreq"
+				};
+	}
+	
+	/**
+	 * Gets the values for the course tuple.
+	 */
+	@Override
+	public String[] getValues() {
+		// TODO Pre-reqs and co-reqs may need to be updated later when
+		// we come up with logic to parse it properly. Faculty probably
+		// not necessary as it wouldn't be referenced consistently anyways,
+		// so a mapping (within crawler project or in PHP) would be more useful instead.
+		return new String[] {
+				getCourseCode(), 
+				title, 
+				credits.toString(),
+				maxCredits.toString(),
+				description, 
+				prereqs, 
+				coreqs
+				};
+	}
+
+	/**
+	 * Gets the DDL for creating this kind of table.
+	 */
+	@Override
+	public String getTableDDL() {
+		String ddl = "CREATE TABLE Course ( "
+				+ "cname VARCHAR(10), "
+				+ "title VARCHAR(100), "
+				+ "credits DECIMAL(3,1), "
+				+ "maxcredits DECIMAL(3,1), "
+				+ "description VARCHAR(1000), "
+				+ "prereq VARCHAR(500), "
+				+ "coreq VARCHAR(500), "
+				+ "PRIMARY KEY(cname) "
+				+ "); ";
+		return ddl;
+	}
+
+	/**
+	 * Gets the table title, in case different than class name.
+	 */
+	@Override
+	public String getTableTitle() {
+		return "Course";
+	}
+
+
+
 }
