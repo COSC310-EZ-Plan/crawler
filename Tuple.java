@@ -7,8 +7,30 @@
  */
 public interface Tuple {
 	
+	/**
+	 * Values for the columns in this tuple.
+	 * @return
+	 */
 	public String[] getValues();
+	
+	/**
+	 * All field names.
+	 * @return
+	 */
 	public String[] getColumns();
+	/**
+	 * Field name(s) of the primary key.
+	 * @return
+	 */
+	public String[] getKeyHeadings();
+	/**
+	 * Full DDL to create the table.
+	 * @return
+	 */
 	public String getTableDDL();
+	/**
+	 * Name of table in the database.
+	 * @return
+	 */
 	public String getTableTitle();
 }

@@ -45,6 +45,12 @@ public class Course implements Tuple {
 		this.prereqs = pre;
 		this.coreqs = co;
 	}
+	/**
+	 * Blank course constructor. Only should be used for dummy entries.
+	 */
+	public Course() {
+		this(null, -1, null, null, null, null, null, null);
+	}
 	
 	/**
 	 * Getter methods (mostly unnecessary, actually)
@@ -146,6 +152,12 @@ public class Course implements Tuple {
 	@Override
 	public String getTableTitle() {
 		return "Course";
+	}
+
+	@Override
+	public String[] getKeyHeadings() {
+		// TODO Auto-generated method stub
+		return new String[] {"cname"};
 	}
 
 

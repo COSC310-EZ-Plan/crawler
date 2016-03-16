@@ -47,12 +47,10 @@ public class Crawler {
 	}
 	
 	/**
-	 * Main method: from the course root page, access and parse courses out from all subject-area subpages
+	 * From the course root page, access and parse courses out from all subject-area subpages
 	 * @param args
 	 */
-	public static void main(String[] args) throws IOException {
-		
-		Crawler crawler = new Crawler();
+	public ArrayList<Tuple> fullCrawl() throws IOException {
 		
 		// Load the subject area list page (linking to each sublist of courses according to subject area)
 		Document nav = Jsoup.connect(ROOT_URL).get();
@@ -61,8 +59,6 @@ public class Crawler {
 		// for table rows containing a course list link for a faculty
 		Elements pages = nav.body().select("tr.row-highlight"); 
 		
-		System.out.println("Retrieving course data...");
-		
 		// Parse out all courses and add them to the course list
 		/* */
 		for (Element page : pages) {
@@ -70,7 +66,7 @@ public class Crawler {
 			// in current version of course root, will be the text of
 			// the row-highlight's child "td a" grandchild
 			String subjectCode = page.child(0).child(0).ownText();
-			crawler.parseCoursesFrom(subjectCode);
+			parseCoursesFrom(subjectCode);
 		}
 		/* */
 		
@@ -79,41 +75,7 @@ public class Crawler {
 		crawler.parseCoursesFrom(pages.get(8).child(0).child(0).ownText());
 		/* */
 		
-		System.out.println("Course data retrieved. Populating table...");
-		/* */
-		
-		/*
-		// Initially, wrote to a text file line-by-line with courses listed as tuples 
-		PrintWriter writer = new PrintWriter("sample-output.txt");
-		for (Course c: crawler.courseList) {
-			writer.println(c.toString());
-		}
-		writer.close();
-		/* */
-		
-		// For demonstration purposes, faster to just parse one subject worth (COSC in this case):
-		/* 
-		crawler.parseAllFrom(pages.get(8).child(0).child(0).ownText());
-		// Format courses in list as tuples and print line-by-line
-		for (Course c : crawler.courseList) {
-			System.out.println(c.toTuple());
-		}
-		/* */
-		
-		// Rather than printing out, add each course to database.
-		String path = "jdbc:mysql://cosc304.ok.ubc.ca/db_ewardle",
-				user = "ewardle", pass = "38509121";
-		Tuple first = crawler.courseList.get(0); // ugly syntax...
-		String tableDDL = first.getTableDDL();
-		String tableName = first.getTableTitle();
-		
-		MySQLTableInput table = new MySQLTableInput(path, user, pass);
-		boolean created = table.createTable(tableDDL);
-		int count = table.populateTable(tableName, crawler.courseList.iterator());
-		if (created && count == crawler.courseList.size()) {
-			// Confirm after completion of method.
-			System.out.println("Done populating table with course data.");
-		}
+		return courseList;
 	}
 	
 	/**
